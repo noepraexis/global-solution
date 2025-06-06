@@ -24,13 +24,6 @@ struct TelemetryBuffer {
     float temperature;       ///< Temperatura em graus Celsius
     float humidity;          ///< Umidade relativa do ar em percentual (0-100%)
 
-    // Dados do sistema de irrigação
-    bool irrigationActive;        ///< Estado atual da bomba (ligada/desligada)
-    uint32_t irrigationUptime;    ///< Tempo total de funcionamento em segundos
-    uint32_t lastIrrigationTime;  ///< Timestamp da última ativação
-    uint8_t dailyActivations;     ///< Contador de ativações no dia
-    float moistureThreshold;      ///< Limiar atual de umidade para ativação
-
     // Estatísticas do sistema
     uint32_t freeHeap;             ///< Heap livre em bytes
     uint16_t heapFragmentation;    ///< Fragmentação do heap em percentual

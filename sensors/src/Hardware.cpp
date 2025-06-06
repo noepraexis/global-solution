@@ -31,14 +31,8 @@ namespace Hardware {
         // Configura o pino do LED como saída
         pinMode(PIN_LED_INDICATOR, OUTPUT);
 
-        // Configura o pino do relé de irrigação como saída
-        pinMode(PIN_IRRIGATION_RELAY, OUTPUT);
-
         // Inicializa o LED como desligado
         digitalWrite(PIN_LED_INDICATOR, LED_OFF);
-
-        // Inicializa o relé como desligado (estado seguro)
-        digitalWrite(PIN_IRRIGATION_RELAY, RELAY_OFF);
 
         // Os pinos analógicos não precisam de configuração no ESP32
 

@@ -15,7 +15,6 @@ namespace Hardware {
     // Pinos dos sensores
     constexpr uint8_t PIN_DHT22_SENSOR = 23;    // Sensor digital DHT22 para temperatura e umidade (pino 23 é bidirecional)
     constexpr uint8_t PIN_LED_INDICATOR = 26;   // LED indicador
-    constexpr uint8_t PIN_IRRIGATION_RELAY = 27; // Relé para controle da bomba de irrigação
 
     // Tipo do sensor DHT
     constexpr uint8_t DHT_TYPE = DHT22;         // Usar DHT22 em vez de DHT11
@@ -118,13 +117,6 @@ namespace Hardware {
      * @return true se o relé está ativado, false caso contrário.
      */
     bool getRelayState();
-
-    /**
-     * Verifica se é seguro ativar a irrigação.
-     *
-     * @return true se todas as condições de segurança são atendidas.
-     */
-    bool isIrrigationSafe();
 
 } // namespace Hardware
 

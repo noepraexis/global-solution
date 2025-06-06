@@ -163,14 +163,6 @@ void OutputManager::routeToWebSocket(const char* sensor, TelemetryBuffer& data) 
     sensors["timestamp"] = data.timestamp;
     sensors["readCount"] = data.readCount;
 
-    // Adicionamos os dados do sistema de irrigação
-    JsonObject irrigation = root.createNestedObject("irrigation");
-    irrigation["active"] = data.irrigationActive;
-    irrigation["uptime"] = data.irrigationUptime;
-    irrigation["lastActivation"] = data.lastIrrigationTime;
-    irrigation["activations"] = data.dailyActivations;
-    irrigation["threshold"] = data.moistureThreshold;
-
     // Alimentamos as estatísticas do sistema
     stats["freeHeap"] = data.freeHeap;
     stats["fragmentation"] = data.heapFragmentation;

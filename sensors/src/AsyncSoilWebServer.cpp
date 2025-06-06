@@ -19,7 +19,7 @@ const char AsyncSoilWebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Monitoramento de Solo</title>
+    <title>Sistema de Monitoramento Climático</title>
     <style>
     body {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -63,36 +63,6 @@ const char AsyncSoilWebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
         font-size: 1em;
         line-height: 1.6;
     }
-    .scale {
-        height: 20px;
-        background: linear-gradient(to right, red, yellow, green, blue, purple);
-        border-radius: 10px;
-        position: relative;
-        margin: 10px 0;
-    }
-    .marker {
-        width: 10px;
-        height: 25px;
-        background-color: #2c3e50;
-        position: absolute;
-        top: -2px;
-        transform: translateX(-50%);
-        border-radius: 5px;
-    }
-    .status {
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-size: 0.8em;
-        text-align: center;
-    }
-    .on {
-        background-color: #27ae60;
-        color: white;
-    }
-    .off {
-        background-color: #e74c3c;
-        color: white;
-    }
     @media (max-width: 768px) {
         .container {
             flex-direction: column;
@@ -104,7 +74,8 @@ const char AsyncSoilWebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
     </style>
 </head>
 <body>
-    <h1>Sistema de Monitoramento de Solo</h1>
+    <h1>Sistema de Monitoramento Climático</h1>
+
     <div class="container">
         <div class="box">
             <h2>Temperatura</h2>
@@ -114,18 +85,6 @@ const char AsyncSoilWebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
             <h2>Umidade do Ar</h2>
             <div class="value" id="humidity-value">0.0%</div>
         </div>
-        <div class="box">
-            <h2>Sistema de Irrigação</h2>
-            <div class="value">
-                <span id="pump-status" class="status off">DESLIGADA</span>
-            </div>
-            <button id="pump-toggle" onclick="togglePump()" style="margin: 10px 0; padding: 10px 20px; border: none; border-radius: 5px; background-color: #3498db; color: white; cursor: pointer;">Alternar Bomba</button>
-            <div class="stats">
-                <div>Tempo funcionamento: <span id="pump-runtime">0</span>s</div>
-                <div>Ativações hoje: <span id="pump-activations">0</span></div>
-                <div>Limiar umidade: <span id="moisture-threshold">30.0</span>%</div>
-            </div>
-        </div>
     </div>
 
     <div class="container" style="margin-top: 20px;">
@@ -134,7 +93,7 @@ const char AsyncSoilWebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
             <div class="stats">
                 <div>Memória livre: <span id="free-memory">0</span> bytes</div>
                 <div>Fragmentação: <span id="fragmentation">0</span>%</div>
-                <div>Tempo ativo: <span id="uptime">0</span> segundos</div>
+                <div>Tempo ativo: <span id="uptime">0</span></div>
                 <div>Clientes conectados: <span id="clients">0</span></div>
                 <div>WiFi: <span id="wifi-status">Desconectado</span></div>
             </div>
@@ -142,7 +101,6 @@ const char AsyncSoilWebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
     </div>
 
     <script>
-    // Armazena valores atuais para evitar atualizações desnecessárias
     const currentValues = {
         'temperature-value': '0.0°C',
         'humidity-value': '0.0%',
@@ -150,61 +108,41 @@ const char AsyncSoilWebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
         'fragmentation': '0%',
         'uptime': '0',
         'clients': '0',
-        'wifi-status': 'Desconectado',
-        'pump-status': { text: 'DESLIGADA', className: 'status off' },
-        'pump-runtime': '0',
-        'pump-activations': '0'
+        'wifi-status': 'Desconectado'
     };
 
-    // Função para atualizar elemento apenas se o valor for diferente
-    function updateElementIfChanged(id, newValue, isSpecial = false) {
+    function updateElementIfChanged(id, newValue) {
         const element = document.getElementById(id);
         if (!element) return false;
 
-        if (isSpecial) {
-            // Para elementos com múltiplas propriedades (como status)
-            if (currentValues[id].text !== newValue.text ||
-                currentValues[id].className !== newValue.className) {
-                element.textContent = newValue.text;
-                element.className = newValue.className;
-                currentValues[id] = { ...newValue };
-                return true;
-            }
-        } else {
-            // Para elementos de texto simples
-            if (currentValues[id] !== newValue) {
-                element.textContent = newValue;
-                currentValues[id] = newValue;
-                return true;
-            }
+        if (currentValues[id] !== newValue) {
+            element.textContent = newValue;
+            currentValues[id] = newValue;
+            return true;
         }
+
         return false;
     }
 
-    // WebSocket
     let ws = null;
     let reconnectInterval = 1000;
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 10;
 
     function connectWebSocket() {
-        if (ws) {
-            ws.close();
-        }
+        if (ws) ws.close();
 
-        // Usar protocolo atual (http->ws, https->wss)
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws`;
-
         ws = new WebSocket(wsUrl);
 
-        ws.onopen = function() {
+        ws.onopen = function () {
             console.log('WebSocket conectado');
-            reconnectInterval = 1000; // Reseta intervalo
-            reconnectAttempts = 0;    // Reseta contador
+            reconnectInterval = 1000;
+            reconnectAttempts = 0;
         };
 
-        ws.onmessage = function(event) {
+        ws.onmessage = function (event) {
             try {
                 const data = JSON.parse(event.data);
                 updateUI(data);
@@ -213,142 +151,83 @@ const char AsyncSoilWebServer::INDEX_HTML[] PROGMEM = R"rawliteral(
             }
         };
 
-        ws.onclose = function() {
+        ws.onclose = function () {
             console.log('WebSocket desconectado');
-
-            // Reconecta com backoff exponencial
             if (reconnectAttempts < maxReconnectAttempts) {
-                setTimeout(function() {
+                setTimeout(() => {
                     reconnectAttempts++;
-                    reconnectInterval *= 1.5; // Backoff exponencial
+                    reconnectInterval *= 1.5;
                     connectWebSocket();
                 }, reconnectInterval);
             }
         };
 
-        ws.onerror = function(error) {
+        ws.onerror = function (error) {
             console.error('Erro WebSocket:', error);
-            ws.close(); // Fechará e acionará onclose para reconexão
+            ws.close();
         };
     }
 
     function updateUI(data) {
-        // Atualiza sensores
         if (data.sensors) {
-            // Temperatura
             if (typeof data.sensors.temperature === 'number') {
                 updateElementIfChanged('temperature-value', data.sensors.temperature.toFixed(1) + '°C');
             }
-
-            // Umidade do ar
             if (typeof data.sensors.humidity === 'number') {
                 updateElementIfChanged('humidity-value', data.sensors.humidity.toFixed(1) + '%');
             }
         }
 
-        // Atualiza irrigação
-        if (data.irrigation) {
-            const pumpStatus = document.getElementById('pump-status');
-            const pumpToggle = document.getElementById('pump-toggle');
-
-            if (data.irrigation.active) {
-                updateElementIfChanged('pump-status', {
-                    text: 'LIGADA',
-                    className: 'status on'
-                }, true);
-                if (pumpToggle) pumpToggle.textContent = 'Desligar Bomba';
-            } else {
-                updateElementIfChanged('pump-status', {
-                    text: 'DESLIGADA',
-                    className: 'status off'
-                }, true);
-                if (pumpToggle) pumpToggle.textContent = 'Ligar Bomba';
-            }
-
-            if (data.irrigation.uptime !== undefined) {
-                updateElementIfChanged('pump-runtime', data.irrigation.uptime.toString());
-            }
-
-            if (data.irrigation.dailyActivations !== undefined) {
-                updateElementIfChanged('pump-activations', data.irrigation.dailyActivations.toString());
-            }
-        }
-
-        // Atualiza estatísticas
         if (data.stats) {
-            // Memória livre
             if (data.stats.freeHeap !== undefined) {
                 updateElementIfChanged('free-memory', data.stats.freeHeap.toString());
             }
 
-            // Fragmentação
             if (data.stats.fragmentation !== undefined) {
-                updateElementIfChanged('fragmentation', data.stats.fragmentation);
+                updateElementIfChanged('fragmentation', data.stats.fragmentation + '%');
             }
 
-            // Tempo de atividade formatado
             if (data.stats.uptime !== undefined) {
                 const uptime = data.stats.uptime;
                 const days = Math.floor(uptime / 86400);
                 const hours = Math.floor((uptime % 86400) / 3600);
                 const minutes = Math.floor((uptime % 3600) / 60);
                 const seconds = uptime % 60;
-                const uptimeFormatted =
+                const formatted =
                     (days > 0 ? days + 'd ' : '') +
                     (hours > 0 ? hours + 'h ' : '') +
                     (minutes > 0 ? minutes + 'm ' : '') +
                     seconds + 's';
-
-                updateElementIfChanged('uptime', uptimeFormatted);
+                updateElementIfChanged('uptime', formatted);
             }
 
-            // Clientes conectados
             if (data.stats.clients !== undefined) {
                 updateElementIfChanged('clients', data.stats.clients.toString());
             }
 
-            // Estado do WiFi
             if (data.stats.wifi !== undefined) {
                 updateElementIfChanged('wifi-status', data.stats.wifi);
             }
         }
     }
 
-    function togglePump() {
-        try {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                const command = {
-                    action: 'irrigation_toggle'
-                };
-                ws.send(JSON.stringify(command));
-                console.log('Comando de irrigação enviado');
-            } else {
-                console.error('WebSocket não conectado');
-                alert('Conexão perdida. Recarregue a página.');
-            }
-        } catch (error) {
-            console.error('Erro ao alternar bomba:', error);
-            alert('Erro ao enviar comando. Tente novamente.');
-        }
-    }
-
-    // Conexão inicial
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         connectWebSocket();
 
-        // Fallback: se WebSocket falhar, faz polling
-        setInterval(function() {
-            if (ws && ws.readyState !== WebSocket.OPEN) {
+        // Fallback com polling
+        setInterval(function () {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
                 fetch('/data')
                     .then(response => response.json())
-                    .then(data => updateUI(data))
+                    .then(updateUI)
                     .catch(error => console.error('Erro na API:', error));
             }
         }, 2000);
     });
     </script>
 </body>
-</html>)rawliteral";
+</html>
+)rawliteral";
 
 // Armazena um ponteiro para a instância que está sendo usada
 // Uma vez que a biblioteca não fornece meios de associar o ponteiro this ao websocket
@@ -723,37 +602,13 @@ void AsyncSoilWebServer::processWebSocketCommand(AsyncWebSocketClient *client,
     // Processa o comando baseado na ação
     const char* action = doc["action"];
     if (action) {
-        if (strcmp(action, "irrigation_toggle") == 0) {
-            // Comando para alternar irrigação
-            // Código correto (TOGGLE):
-            bool isActive = m_sensorManager.isIrrigationActive();
-            bool success = isActive ?
-                m_sensorManager.deactivateIrrigation(true) :  // Se ativa, desativa manual
-                m_sensorManager.activateIrrigation();          // Se inativa, ativa
-
-            if (DEBUG_MODE) {
-                DBG_DEBUG(MODULE_NAME, "Comando irrigação do cliente #%u: %s",
-                        client->id(), success ? "sucesso" : "falhou");
-            }
-
-            // Envia confirmação de volta ao cliente
-            StaticJsonDocument<128> response;
-            response["type"] = "irrigation_response";
-            response["success"] = success;
-            response["action"] = "toggle";
-
-            String responseStr;
-            serializeJson(response, responseStr);
-            client->text(responseStr);
-
-            // Força atualização imediata dos dados para todos os clientes
-            if (success) {
-                m_sensorManager.update(true);
-                TelemetryBuffer telemetry = m_sensorManager.prepareTelemetry();
-                TELEMETRY(MODULE_NAME, telemetry);
-            }
-        }
-        else {
+        if (strcmp(action, "ping") == 0) {
+        StaticJsonDocument<64> response;
+        response["type"] = "pong";
+        String responseStr;
+        serializeJson(response, responseStr);
+        client->text(responseStr);
+        } else {
             LOG_WARN(MODULE_NAME, "Ação desconhecida recebida: %s", action);
         }
     }

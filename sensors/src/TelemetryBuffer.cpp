@@ -8,11 +8,6 @@
 TelemetryBuffer::TelemetryBuffer()
     : temperature(0.0f),
       humidity(0.0f),
-      irrigationActive(false),
-      irrigationUptime(0),
-      lastIrrigationTime(0),
-      dailyActivations(0),
-      moistureThreshold(MOISTURE_THRESHOLD_LOW),
       freeHeap(0),
       heapFragmentation(0),
       uptime(0),
@@ -31,14 +26,6 @@ void TelemetryBuffer::toJson(JsonObject& json) const {
     sensors["humidity"] = humidity;
     sensors["timestamp"] = timestamp;
     sensors["readCount"] = readCount;
-
-    // Adicionar dados do sistema de irrigação
-    JsonObject irrigation = json.createNestedObject("irrigation");
-    irrigation["active"] = irrigationActive;
-    irrigation["uptime"] = irrigationUptime;
-    irrigation["lastActivation"] = lastIrrigationTime;
-    irrigation["activations"] = dailyActivations;
-    irrigation["threshold"] = moistureThreshold;
 
     // Adicionar estatísticas do sistema
     JsonObject stats = json.createNestedObject("stats");
@@ -82,11 +69,8 @@ char* TelemetryBuffer::toConsoleString(char* buffer, size_t bufferSize, Telemetr
             // Implementação que combina todos os tipos
             // Limitado pelo tamanho do buffer, então pode ser mais resumido
             snprintf(buffer, bufferSize,
-                "Sensores: T=%.1f°C H=%.1f%% | Irrigação: %s Up=%us Act=%d | Sys: Heap=%u Up=%us | WiFi: %s",
+                "Sensores: T=%.1f°C H=%.1f%% | Sys: Heap=%u Up=%us | WiFi: %s",
                 temperature, humidity,
-                irrigationActive ? "ON" : "OFF",
-                irrigationUptime,
-                dailyActivations,
                 freeHeap, uptime,
                 ipAddress);
             break;
