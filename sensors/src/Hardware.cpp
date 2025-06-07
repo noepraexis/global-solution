@@ -34,8 +34,6 @@ namespace Hardware {
         // Inicializa o LED como desligado
         digitalWrite(PIN_LED_INDICATOR, LED_OFF);
 
-        // Os pinos analógicos não precisam de configuração no ESP32
-
         // Inicializa o sensor DHT22
         if (initDHT()) {
             LOG_INFO(MODULE_NAME, "Sensor DHT22 inicializado com sucesso (%.1f°C)", g_currentValues.temperature);

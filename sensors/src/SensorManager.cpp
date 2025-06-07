@@ -180,10 +180,7 @@ bool SensorManager::update(bool forceUpdate) {
         if (currentTime - lastDisplayUpdate >= 500) { // 2Hz é suficiente para visualização
             lastDisplayUpdate = currentTime;
         }
-
-        // Verifica mudanças de estado
-        checkStateChanges();
-
+        
         dataChanged = true;
     }
 

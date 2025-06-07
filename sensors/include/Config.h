@@ -49,6 +49,19 @@
 #define DEBUG_MEMORY              false  // Depuração de uso de memória
 #endif
 
+
+// =======================================================
+//          CONFIGURAÇÕES DO CLIENTE DE API
+// =======================================================
+
+// Defina aqui o endpoint da sua API para onde os dados serão enviados
+#define API_ENDPOINT_URL "http://seuservidor.com/api/dados"
+
+// Intervalo em milissegundos para enviar os dados para a API
+#define API_SEND_INTERVAL 30000 // 30 segundos
+
+
+
 // ==========================================
 // Configurações do Sistema de Logging
 // ==========================================

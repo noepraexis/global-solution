@@ -11,7 +11,7 @@
 ### 2. **Montar o circuito de sensores (virtual)**
 
 - **Tarefa**: Configurar os sensores corretamente na simulação (Wokwi).
-- **Progresso**: Em andamento. Criada versão inicial (com apenas um sensor e um led).
+- **Progresso**: Feito. Criado diagrama com um sensor e um led.
 - **Melhor prática**:
   - No **Wokwi**, usar os blocos de sensores conectando aos **pinos GPIO compatíveis**.
   - Evitar usar GPIOs reservados da ESP32 (ex: GPIOs 6-11 usados pelo flash).
