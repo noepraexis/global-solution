@@ -48,7 +48,13 @@ Este módulo executa os seguintes passos em ciclo contínuo:
 
 ---
 
-## 🔧 Hardware e Pinos
+## 🔧 Diagrama do Circuito
+
+
+![Diagrama do Circuito](/diagram.jpg)
+
+
+### Hardware e Pinos
 
 | Componente | Pino ESP32 | Função |
 | :--- | :--- | :--- |
