@@ -1,0 +1,25 @@
+{
+  "url": "https://www.gdacs.org/",
+  "name": "GDACS - Sistema Global de Alertas",
+  "timestamp": "2025-06-04T03:11:51.944486",
+  "text_length": 9122,
+  "images_found": 10,
+  "image_types": {
+    "img": 10
+  },
+  "keywords_found": [
+    "flood",
+    "earthquake",
+    "cyclone",
+    "disaster",
+    "emergency",
+    "alert",
+    "warning",
+    "evacuate",
+    "damage",
+    "casualties"
+  ],
+  "alerts_detected": 3,
+  "numbers_found": 144,
+  "dates_found": 0
+}

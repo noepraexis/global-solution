@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script modular para análise preditiva de desastres naturais
-Versão 0.1.0 - Arquitetura extensível com módulos especializados
+Versão 2.0 - Arquitetura extensível com módulos especializados
 """
 
 import requests
@@ -14,9 +14,9 @@ from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Any, Optional, Protocol
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
-from pathlib import Path
 import importlib
 import sys
+from pathlib import Path
 
 # Adicionar o diretório de módulos ao path
 sys.path.insert(0, str(Path(__file__).parent / "modules"))
@@ -60,10 +60,16 @@ class DisasterFeatures:
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     region: Optional[str] = None
+    state: Optional[str] = None
     precipitation_mm: Optional[float] = None
+    precipitation_7d_mm: Optional[float] = None
+    precipitation_30d_mm: Optional[float] = None
     temperature_c: Optional[float] = None
+    temperature_max_c: Optional[float] = None
+    temperature_min_c: Optional[float] = None
     humidity_percent: Optional[float] = None
     wind_speed_kmh: Optional[float] = None
+    wind_max_kmh: Optional[float] = None
     atmospheric_pressure_hpa: Optional[float] = None
     affected_population: Optional[int] = None
     deaths: Optional[int] = None
@@ -74,6 +80,16 @@ class DisasterFeatures:
     previous_events_90d: Optional[int] = None
     urbanization_index: Optional[float] = None
     vulnerability_index: Optional[float] = None
+    human_development_index: Optional[float] = None
+    gdp_per_capita_brl: Optional[float] = None
+    population: Optional[int] = None
+    elevation: Optional[float] = None
+    enso_phase: Optional[str] = None
+    days_in_year: Optional[int] = None
+    week_of_year: Optional[int] = None
+    is_weekend: Optional[bool] = None
+    weather_station_distance_km: Optional[float] = None
+    weather_station_name: Optional[str] = None
     news_sentiment_score: Optional[float] = None
     social_media_mentions: Optional[int] = None
     emergency_response_time_hours: Optional[float] = None
@@ -169,7 +185,7 @@ class ModularGLIDELookup:
         self.incident_search = IncidentSearchService()
         
         # Carregar módulo específico
-        self.analysis_module = self._load_module(module_name)
+        self.analysis_module = self._load_analysis_module(module_name)
         
         # Extrator de dados web - apenas se disponível
         try:
@@ -178,6 +194,18 @@ class ModularGLIDELookup:
         except ImportError:
             self.logger.warning("Módulo data_extractors não encontrado. Extração web desabilitada.")
             self.web_extractor = None
+        
+        # Sistema de enriquecimento de dados
+        try:
+            from data_enrichment import DataEnricher
+            self.data_enricher = DataEnricher(
+                inmet_dir="inmet",
+                emdat_file="emdat/public_emdat_custom_request_2025-06-06_0e25b758-5490-41a1-a49f-fcbea70c84ee.xlsx"
+            )
+            self.logger.info("Sistema de enriquecimento de dados carregado com sucesso")
+        except Exception as e:
+            self.logger.warning(f"Sistema de enriquecimento não disponível: {e}")
+            self.data_enricher = None
         
         # Cache para evitar re-extração
         self.extraction_cache = {}
@@ -213,13 +241,30 @@ class ModularGLIDELookup:
         
         return session
     
-    def _load_module(self, module_name: str):
+    def _load_analysis_module(self, module_name: str):
         """Carrega módulo de análise específico"""
         try:
-            module = importlib.import_module(f"{module_name}_analysis")
-            return module.create_analyzer()
-        except ImportError:
-            self.logger.warning(f"Módulo {module_name}_analysis não encontrado, usando padrão")
+            # Adiciona o diretório atual ao path se necessário
+            current_dir = Path(__file__).parent
+            if str(current_dir) not in sys.path:
+                sys.path.insert(0, str(current_dir))
+            
+            # Tenta importar o módulo
+            module_path = f"modules.{module_name}"
+            module = importlib.import_module(module_path)
+            
+            # Verifica se tem a função create_module
+            if hasattr(module, 'create_module'):
+                return module.create_module()
+            else:
+                self.logger.error(f"Módulo {module_name} não tem função create_module")
+                return None
+                
+        except ImportError as e:
+            self.logger.warning(f"Módulo {module_name} não encontrado: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Erro ao carregar módulo {module_name}: {e}")
             return None
     
     def fetch_brazil_floods(self):  # Removida anotação de tipo
@@ -455,32 +500,91 @@ class ModularGLIDELookup:
                     
                     for source in enhanced.internet_sources[:3]:  # Limitar para performance
                         try:
-                            web_data = self.web_extractor.extract_from_url(source.link)
-                            enhanced.raw_web_data[source.display_link] = web_data
+                            # Usar o novo método que retorna ExtractionReport
+                            extraction_report = self.web_extractor.extract_from_url(source.link)
+                            
+                            if extraction_report.success:
+                                enhanced.raw_web_data[source.display_link] = extraction_report.data
+                                
+                                # Log de campos extraídos com sucesso
+                                extracted_fields = [k for k, v in extraction_report.data.items() 
+                                                  if v is not None and k not in ['source_url', 'extraction_timestamp', 'source_domain']]
+                                if extracted_fields:
+                                    self.logger.info(f"    Extraído de {source.display_link}: {', '.join(extracted_fields[:5])}")
+                                
+                                # Adicionar avisos se houver
+                                if extraction_report.errors:
+                                    for error in extraction_report.errors:
+                                        enhanced.extraction_errors.append(f"Aviso em {source.link}: {error}")
+                            else:
+                                enhanced.extraction_errors.append(f"Falha ao extrair {source.link}: {', '.join(extraction_report.errors)}")
+                            
                             time.sleep(0.5)  # Rate limiting
                         except Exception as e:
                             enhanced.extraction_errors.append(f"Erro ao extrair {source.link}: {str(e)}")
                 
+                # Preparar dados do desastre para enriquecimento
+                disaster_data = {
+                    'glide': basic_disaster.glide,
+                    'name': basic_disaster.name,
+                    'date': basic_disaster.date,
+                    'type': basic_disaster.type,
+                    'status': basic_disaster.status,
+                    'country': basic_disaster.country,
+                    'internet_sources': enhanced.internet_sources,  # Passar URLs para extração web
+                    'raw_web_data': enhanced.raw_web_data  # Passar dados web também
+                }
+                
+                # Aplicar enriquecimento de dados se disponível
+                if self.data_enricher:
+                    self.logger.info("  Aplicando enriquecimento de dados...")
+                    try:
+                        enriched_data = self.data_enricher.enrich_disaster_data(disaster_data)
+                        
+                        # Mesclar com dados da web
+                        for source_data in enhanced.raw_web_data.values():
+                            if isinstance(source_data, dict):
+                                # Priorizar dados da web quando disponíveis
+                                for key, value in source_data.items():
+                                    if key not in enriched_data or enriched_data[key] is None:
+                                        enriched_data[key] = value
+                        
+                        disaster_data = enriched_data
+                        
+                        # Log de campos enriquecidos
+                        enriched_fields = [k for k in enriched_data.keys() 
+                                         if k not in ['glide', 'name', 'date', 'type', 'status', 'country']
+                                         and enriched_data[k] is not None]
+                        if enriched_fields:
+                            self.logger.info(f"    Campos enriquecidos: {', '.join(enriched_fields[:10])}")
+                        
+                    except Exception as e:
+                        self.logger.warning(f"    Erro no enriquecimento: {str(e)}")
+                        enhanced.extraction_errors.append(f"Erro no enriquecimento: {str(e)}")
+                
                 # Criar features usando módulo específico
-                if self.analysis_module and enhanced.raw_web_data:
-                    from dataclasses import asdict
+                if self.analysis_module:
                     features_dict = self.analysis_module.extract_features(
-                        disaster_info={
-                            'glide': basic_disaster.glide,
-                            'name': basic_disaster.name,
-                            'date': basic_disaster.date,
-                            'type': basic_disaster.type,
-                            'status': basic_disaster.status,
-                            'country': basic_disaster.country
-                        },
+                        disaster_info=disaster_data,
                         web_content=enhanced.raw_web_data
                     )
                     
+                    # Mesclar com dados enriquecidos
+                    for key, value in disaster_data.items():
+                        if key not in features_dict or features_dict[key] is None:
+                            features_dict[key] = value
+                    
                     # Converter para DisasterFeatures
                     enhanced.features = self._create_features_from_dict(features_dict, basic_disaster)
-                elif not self.analysis_module:
-                    # Criar features básicas sem módulo
+                else:
+                    # Criar features básicas
                     enhanced.features = self._create_basic_features(basic_disaster)
+                    
+                    # Adicionar dados enriquecidos às features
+                    if self.data_enricher:
+                        for attr, value in disaster_data.items():
+                            if hasattr(enhanced.features, attr) and value is not None:
+                                setattr(enhanced.features, attr, value)
                 
                 # Calcular completude
                 enhanced.calculate_completeness()
@@ -565,89 +669,226 @@ class ModularGLIDELookup:
     
     def save_ml_dataset(self, dataset: MLReadyDataset, base_filename: str = "brazil_floods_ml"):
         """Salva dataset em formatos otimizados para ML"""
+        import os
+        from datetime import datetime
+        
+        # Criar diretório de saída se não existir
+        output_dir = "ml_datasets"
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Gerar timestamp legível para nome único
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_filename = f"{base_filename}_{timestamp}"
+        
+        # Caminho completo dos arquivos
+        json_path = os.path.join(output_dir, f"{unique_filename}_complete.json")
+        csv_path = os.path.join(output_dir, f"{unique_filename}_features.csv")
+        report_path = os.path.join(output_dir, f"{unique_filename}_quality_report.txt")
+        
+        # Criar também um link simbólico para o "latest" de cada tipo
+        latest_json = os.path.join(output_dir, f"{base_filename}_latest_complete.json")
+        latest_csv = os.path.join(output_dir, f"{base_filename}_latest_features.csv")
+        latest_report = os.path.join(output_dir, f"{base_filename}_latest_quality_report.txt")
+        
         # JSON com estrutura completa
-        with open(f"{base_filename}_complete.json", "w", encoding="utf-8") as f:
-            json.dump({
+        with open(json_path, "w", encoding="utf-8") as f:
+            # Preparar dados para serialização
+            export_data = {
                 'metadata': dataset.metadata,
                 'features': dataset.features_matrix,
-                'disasters': [
-                    {
-                        'glide': d.glide,
-                        'name': d.name,
-                        'completeness': d.data_completeness,
-                        'errors': d.extraction_errors
-                    }
-                    for d in dataset.disasters
-                ]
-            }, f, ensure_ascii=False, indent=2)
-        
-        # CSV para features numéricas
-        if dataset.features_matrix:
-            import pandas as pd
-            df = pd.DataFrame(dataset.features_matrix)
-            df.to_csv(f"{base_filename}_features.csv", index=False)
-            self.logger.info(f"Dataset ML salvo: {len(df)} amostras com {len(df.columns)} features")
-        
-        # Relatório de qualidade
-        with open(f"{base_filename}_quality_report.txt", "w", encoding="utf-8") as f:
-            f.write("RELATÓRIO DE QUALIDADE DO DATASET\n")
-            f.write("="*60 + "\n\n")
-            f.write(f"Total de desastres processados: {len(dataset.disasters)}\n")
-            f.write(f"Amostras adequadas para ML (>60% completude): {len(dataset.features_matrix)}\n")
-            f.write(f"Taxa de aproveitamento: {len(dataset.features_matrix)/len(dataset.disasters)*100:.1f}%\n\n")
+                'disasters': []
+            }
             
-            # Estatísticas de completude
-            completeness_scores = [d.data_completeness for d in dataset.disasters]
-            f.write(f"Completude média: {sum(completeness_scores)/len(completeness_scores)*100:.1f}%\n")
-            f.write(f"Completude mínima: {min(completeness_scores)*100:.1f}%\n")
-            f.write(f"Completude máxima: {max(completeness_scores)*100:.1f}%\n\n")
-            
-            # Erros mais comuns
-            all_errors = []
+            # Adicionar informações detalhadas de cada desastre
             for d in dataset.disasters:
-                all_errors.extend(d.extraction_errors)
+                disaster_data = {
+                    'glide': d.glide,
+                    'name': d.name,
+                    'date': d.date,
+                    'type': d.type,
+                    'status': d.status,
+                    'completeness': d.data_completeness,
+                    'errors': d.extraction_errors,
+                    'total_online_references': d.total_online_references,
+                    'raw_features': None
+                }
+                
+                # Adicionar features se existirem
+                if d.features:
+                    disaster_data['raw_features'] = d.features.to_ml_dict()
+                
+                export_data['disasters'].append(disaster_data)
             
-            if all_errors:
-                f.write("ERROS DE EXTRAÇÃO MAIS COMUNS:\n")
-                from collections import Counter
-                error_counts = Counter(all_errors)
-                for error, count in error_counts.most_common(10):
-                    f.write(f"  - {error[:100]}... ({count} ocorrências)\n")
+            json.dump(export_data, f, ensure_ascii=False, indent=2, default=str)
+            self.logger.info(f"Dataset JSON salvo em: {json_path}")
+        
+        # CSV para features numéricas - incluir TODOS os desastres
+        all_features = []
+        for d in dataset.disasters:
+            if d.features:
+                features_dict = d.features.to_ml_dict()
+                features_dict['glide'] = d.glide
+                features_dict['completeness'] = d.data_completeness
+                all_features.append(features_dict)
+        
+        if all_features:
+            try:
+                import pandas as pd
+                df = pd.DataFrame(all_features)
+                df.to_csv(csv_path, index=False)
+                self.logger.info(f"Dataset CSV salvo em: {csv_path} ({len(df)} registros)")
+            except ImportError:
+                self.logger.warning("Pandas não instalado. Salvando CSV manualmente...")
+                # Salvar CSV manualmente
+                if all_features:
+                    headers = list(all_features[0].keys())
+                    with open(csv_path, 'w', encoding='utf-8') as f:
+                        # Escrever cabeçalhos
+                        f.write(','.join(headers) + '\n')
+                        # Escrever dados
+                        for row in all_features:
+                            values = [str(row.get(h, '')) for h in headers]
+                            f.write(','.join(values) + '\n')
+                    self.logger.info(f"Dataset CSV salvo em: {csv_path} ({len(all_features)} registros)")
+        
+        # Relatório de qualidade detalhado
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write("RELATÓRIO DE QUALIDADE DO DATASET - ANÁLISE DE ENCHENTES BRASIL\n")
+            f.write("="*80 + "\n\n")
+            f.write(f"Data de geração: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Total de desastres processados: {len(dataset.disasters)}\n")
+            f.write(f"Total de features extraídas: {len(all_features)}\n")
+            f.write(f"Amostras adequadas para ML (>60% completude): {len(dataset.features_matrix)}\n")
+            
+            if dataset.disasters:
+                f.write(f"Taxa de aproveitamento: {len(dataset.features_matrix)/len(dataset.disasters)*100:.1f}%\n\n")
+                
+                # Estatísticas de completude
+                completeness_scores = [d.data_completeness for d in dataset.disasters]
+                f.write("ESTATÍSTICAS DE COMPLETUDE:\n")
+                f.write(f"  - Média: {sum(completeness_scores)/len(completeness_scores)*100:.1f}%\n")
+                f.write(f"  - Mínima: {min(completeness_scores)*100:.1f}%\n")
+                f.write(f"  - Máxima: {max(completeness_scores)*100:.1f}%\n\n")
+                
+                # Desastres por nível de completude
+                f.write("DISTRIBUIÇÃO POR COMPLETUDE:\n")
+                high_quality = sum(1 for s in completeness_scores if s > 0.8)
+                medium_quality = sum(1 for s in completeness_scores if 0.4 <= s <= 0.8)
+                low_quality = sum(1 for s in completeness_scores if s < 0.4)
+                f.write(f"  - Alta (>80%): {high_quality} desastres\n")
+                f.write(f"  - Média (40-80%): {medium_quality} desastres\n")
+                f.write(f"  - Baixa (<40%): {low_quality} desastres\n\n")
+                
+                # Listar desastres com melhor qualidade
+                f.write("TOP 10 DESASTRES COM MELHOR QUALIDADE DE DADOS:\n")
+                sorted_disasters = sorted(dataset.disasters, key=lambda x: x.data_completeness, reverse=True)[:10]
+                for i, d in enumerate(sorted_disasters, 1):
+                    f.write(f"  {i}. {d.glide} - {d.name} ({d.data_completeness*100:.1f}%)\n")
+                
+                # Erros mais comuns
+                all_errors = []
+                for d in dataset.disasters:
+                    all_errors.extend(d.extraction_errors)
+                
+                if all_errors:
+                    f.write("\nERROS DE EXTRAÇÃO MAIS COMUNS:\n")
+                    from collections import Counter
+                    error_counts = Counter(all_errors)
+                    for error, count in error_counts.most_common(10):
+                        f.write(f"  - {error[:100]}... ({count} ocorrências)\n")
+                
+                # Estatísticas de fontes online
+                f.write("\nESTATÍSTICAS DE FONTES ONLINE:\n")
+                total_refs = sum(d.total_online_references for d in dataset.disasters)
+                avg_refs = total_refs / len(dataset.disasters) if dataset.disasters else 0
+                f.write(f"  - Total de referências encontradas: {total_refs}\n")
+                f.write(f"  - Média por desastre: {avg_refs:.1f}\n")
+                
+                # Features mais preenchidas
+                if all_features:
+                    f.write("\nFEATURES MAIS COMPLETAS:\n")
+                    feature_counts = {}
+                    for feat_dict in all_features:
+                        for key, value in feat_dict.items():
+                            if value is not None and key not in ['glide', 'completeness', 'extraction_timestamp']:
+                                feature_counts[key] = feature_counts.get(key, 0) + 1
+                    
+                    sorted_features = sorted(feature_counts.items(), key=lambda x: x[1], reverse=True)
+                    for feat, count in sorted_features[:10]:
+                        percentage = (count / len(all_features)) * 100
+                        f.write(f"  - {feat}: {count}/{len(all_features)} ({percentage:.1f}%)\n")
+        
+        self.logger.info(f"Relatório de qualidade salvo em: {report_path}")
+        
+        # Criar links simbólicos para os arquivos mais recentes (apenas em sistemas Unix-like)
+        try:
+            import platform
+            if platform.system() != 'Windows':
+                # Remover links antigos se existirem
+                for link in [latest_json, latest_csv, latest_report]:
+                    if os.path.islink(link):
+                        os.unlink(link)
+                
+                # Criar novos links
+                os.symlink(os.path.basename(json_path), latest_json)
+                os.symlink(os.path.basename(csv_path), latest_csv)
+                os.symlink(os.path.basename(report_path), latest_report)
+                
+                self.logger.info("Links simbólicos 'latest' criados com sucesso")
+        except Exception as e:
+            self.logger.debug(f"Não foi possível criar links simbólicos: {e}")
+        
+        # Resumo final
+        print(f"\n{'='*60}")
+        print("ARQUIVOS SALVOS COM SUCESSO:")
+        print(f"  - Dataset completo (JSON): {json_path}")
+        print(f"  - Features numéricas (CSV): {csv_path}")
+        print(f"  - Relatório de qualidade: {report_path}")
+        print(f"\nTimestamp: {timestamp}")
+        print(f"Diretório: {os.path.abspath(output_dir)}")
+        print(f"{'='*60}\n")
 
 def main():
+    """Função principal"""
     print("Sistema Modular de Análise Preditiva de Desastres Naturais v2.0")
-    print("="*60)
+    print("============================================================\n")
     
-    # Opções de execução
-    print("\nEscolha o modo de operação:")
+    # Seleção de modo
+    print("Escolha o modo de operação:")
     print("1. Análise básica (coleta e busca online)")
     print("2. Análise avançada com ML (requer módulos adicionais)")
+    print()
     
-    modo = input("\nModo (1 ou 2) [padrão: 1]: ").strip() or "1"
+    mode = input("Modo (1 ou 2) [padrão: 1]: ").strip() or "1"
     
-    if modo == "1":
-        # Modo básico
-        lookup = ModularGLIDELookup("flood")
-        collection = lookup.fetch_brazil_floods()
+    if mode == "1":
+        # Modo básico - apenas coleta e busca
+        glide_lookup = ModularGLIDELookup()
+        print("\nBuscando eventos de enchente no Brasil...")
+        result = glide_lookup.fetch_brazil_floods()
         
-        if collection.disasters:
-            # Enriquecer com dados da internet
-            enrich = input("\nDeseja buscar informações na internet para cada desastre? (s/n): ").lower() == 's'
+        if result.disasters:
+            # Mostrar resumo
+            print(f"\nTotal de eventos encontrados: {result.total_count}")
+            print("\nPrimeiros 5 eventos:")
+            for event in result.disasters[:5]:
+                print(f"- {event.glide}: {event.name}")
+                print(f"  Data: {event.date}")
+                print(f"  Fontes online: {event.total_online_references}")
+                print()
             
-            if enrich:
-                max_sources = int(input("Quantas fontes por desastre (padrão 5): ") or "5")
-                lookup.enrich_with_internet_data(collection, max_sources)
+            # Salvar arquivos
+            # JSON completo
+            with open("brazil_fl_disasters.json", "w", encoding="utf-8") as f:
+                json.dump(result.to_dict(), f, ensure_ascii=False, indent=2)
+            print(f"\nDados completos salvos em brazil_fl_disasters.json")
             
-            # Salvar resultados
-            lookup.print_summary(collection)
-            lookup.save_to_json(collection)
-            lookup.save_to_csv(collection)
-            lookup.save_detailed_report(collection)
+            # CSV resumido
+            result.to_csv("brazil_fl_disasters.csv")
+            print(f"Resumo em CSV salvo em brazil_fl_disasters.csv")
             
-            # Extrair apenas os GLIDE numbers
-            glide_numbers = [d.glide for d in collection.disasters if d.glide]
-            
-            # Salvar lista simples de GLIDE numbers
+            # Lista simples de GLIDE numbers
+            glide_numbers = [d.glide for d in result.disasters]
             with open("brazil_fl_glide_numbers.txt", "w") as f:
                 f.write("\n".join(glide_numbers))
             print(f"\nLista de GLIDE numbers salva em brazil_fl_glide_numbers.txt")
