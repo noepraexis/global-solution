@@ -1,14 +1,14 @@
 # Sistema de Prevenção de Desastres Naturais com ESP32
 
-## 📖 Sobre o este módulo do projeto
+## 📖 Sobre este módulo do projeto
 
-Este modulo (`/sensors`) lida com um dispositivo IoT (Internet das Coisas) focado na prevenção de desastres naturais. O sistema utiliza um microcontrolador ESP32 para coletar dados ambientais, como temperatura e umidade, que são cruciais para a identificação de riscos como incêndios florestais ou deslizamentos.
+Este módulo (`/sensors`) lida com um dispositivo IoT (Internet das Coisas) focado na prevenção de desastres naturais. O sistema utiliza um microcontrolador ESP32 para coletar dados ambientais, como temperatura e umidade, que são cruciais para a identificação de riscos como enchentes ou incêndios florestais.
 
 O dispositivo envia os dados coletados para uma API central, que seria responsável por analisar as informações e gerar alertas.
 
-## ✅ Status das 4 Tarefas Principais
+## ✅ Status das Principais Tarefas deste Módulo
 
-As quatro metas iniciais definidas para o projeto foram concluídas com sucesso.
+As quatro metas técnicas iniciais para o desenvolvimento deste módulo foram concluídas com sucesso:
 
 ### 1. Definir os sensores adequados
 - **Status:** ✅ Concluída
@@ -20,7 +20,7 @@ As quatro metas iniciais definidas para o projeto foram concluídas com sucesso.
 
 ### 3. Escrever o código de leitura dos sensores
 - **Status:** ✅ Concluída
-- **Detalhes:** O firmware foi desenvolvido em **C++** com PlatformIO. O módulo `SensorManager` é responsável por fazer a leitura contínua dos dados, aplicando filtros para garantir a qualidade das medições.
+- **Detalhes:** O software foi desenvolvido em **C++** com PlatformIO. O módulo `SensorManager` é responsável por fazer a leitura contínua dos dados, aplicando filtros para garantir a qualidade das medições.
 
 ### 4. Transmitir os dados para o sistema principal
 - **Status:** ✅ Concluída
@@ -37,7 +37,9 @@ As quatro metas iniciais definidas para o projeto foram concluídas com sucesso.
 
 ---
 
-## ⚙️ Como o Sistema Funciona
+## ⚙️ Funcionamento do Módulo
+
+Este módulo executa os seguintes passos em ciclo contínuo:
 
 1.  **Leitura**: O `SensorManager` lê os valores de temperatura e umidade do sensor DHT22 em intervalos regulares.
 2.  **Conexão**: O `WiFiManager` conecta o ESP32 a uma rede Wi-Fi e gerencia a reconexão automática em caso de falha.
@@ -50,23 +52,22 @@ As quatro metas iniciais definidas para o projeto foram concluídas com sucesso.
 
 | Componente | Pino ESP32 | Função |
 | :--- | :--- | :--- |
-| **DHT22** (Data) | `GPIO23` | Ler umidade/temperatura |
-| **LED** (Indicador) | `GPIO21` | Alertar Perigo / Status |
+| **DHT22** (Data) | `GPIO23` |	Medição de temperatura e umidade |
+| **LED** (Indicador) | `GPIO21` | Indicação de status ou alerta |
 
 ---
 
-## 🚀 Como Executar o Projeto
+## 🚀 Como Executar este Módulo Localmente
 
 ### Pré-requisitos
 - [Visual Studio Code](https://code.visualstudio.com/)
 - Extensão [PlatformIO IDE](https://platformio.org/platformio-ide)
 
 ### Passos
-1.  **Clone o repositório** e abra a pasta no VS Code.
+1.  **Clone o repositório** e abra a pasta `/sensors` no VS Code.
 2.  **Configure o WiFi e a API**: Altere as credenciais do WiFi (`WIFI_SSID`, `WIFI_PASSWORD`) e o endereço da sua API (`API_ENDPOINT_URL`) no arquivo `include/Config.h`.
 3.  **Compile e Envie**: Use os botões do PlatformIO na barra de status (`Build`, `Upload`) para carregar o código no seu ESP32.
 4.  **Monitore**: Abra o `Serial Monitor` para acompanhar os logs e ver o endereço IP do dispositivo.
 
 ### Simulação no Wokwi
-O projeto é compatível com o simulador **Wokwi**. Basta carregar os arquivos do projeto. O código irá se adaptar automaticamente ao ambiente de simulação. Você pode clicar no sensor DHT22 para alterar os valores e testar o sistema.
-```
+Este módulo é compatível com o simulador **Wokwi**. Basta carregar os arquivos do projeto. O código irá se adaptar automaticamente ao ambiente de simulação. Você pode clicar no sensor DHT22 para alterar os valores e testar o sistema.
