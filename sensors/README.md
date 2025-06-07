@@ -51,7 +51,7 @@ Este módulo executa os seguintes passos em ciclo contínuo:
 ## 🔧 Diagrama do Circuito
 
 
-![Diagrama do Circuito](/diagram.jpg)
+![Diagrama do Circuito](/sensors/diagram.jpg)
 
 
 ### Hardware e Pinos
