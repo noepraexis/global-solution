@@ -16,6 +16,7 @@
 #include "WifiPerformance.h"
 #include "LogSystem.h"
 #include "OutputManager.h"
+#include "ApiClient.h"
 
 // Define o nome do módulo para logging
 #define MODULE_NAME "Main"
@@ -23,6 +24,7 @@
 // Instâncias dos componentes
 SensorManager *g_sensorManager = nullptr;
 AsyncSoilWebServer *g_webServer = nullptr;
+ApiClient *g_apiClient = nullptr;
 
 // Tarefas FreeRTOS
 TaskHandle_t g_sensorTask = nullptr;
@@ -98,6 +100,9 @@ void sensorTaskFunc(void *pvParameters) {
     const TickType_t xFrequency = pdMS_TO_TICKS(10); // 100Hz
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
+    // Variável para controlar o envio para a API
+    uint32_t lastApiSendTime = 0; 
+
     LOG_DEBUG(MODULE_NAME, "Tarefa de sensores iniciada (Core %d)", xPortGetCoreID());
 
     // Espera para garantir que todas as inicializações foram concluídas
@@ -107,7 +112,25 @@ void sensorTaskFunc(void *pvParameters) {
         // Atualiza sensores
         if (g_sensorMutex != nullptr &&
             xSemaphoreTake(g_sensorMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-            g_sensorManager->update();
+            
+            // A função update do SensorManager agora retorna true se os dados mudaram
+            bool dataUpdated = g_sensorManager->update();
+
+            // Se os dados foram atualizados, tentamos enviar para a API
+            if (dataUpdated) {
+                uint32_t currentTime = millis();
+                if (g_apiClient != nullptr && (currentTime - lastApiSendTime > API_SEND_INTERVAL)) {
+                    // Pega os dados mais recentes do sensor manager
+                    const SensorData& currentData = g_sensorManager->getData();
+                    
+                    // Envia os dados
+                    g_apiClient->sendData(currentData);
+                    
+                    // Atualiza o tempo do último envio
+                    lastApiSendTime = currentTime;
+                }
+            }
+            
             xSemaphoreGive(g_sensorMutex);
         }
 
@@ -375,6 +398,19 @@ void setup() {
             delay(1000);
         }
     }
+
+
+    // =======================================================
+    //          INICIALIZAÇÃO DO NOVO API CLIENT
+    // =======================================================
+    g_apiClient = new ApiClient(API_ENDPOINT_URL);
+    if (!g_apiClient) {
+        LOG_FATAL(MODULE_NAME, "ERRO: Falha ao criar ApiClient!");
+        while(true) { delay(1000); }
+    }
+    // =======================================================
+
+    
 
     // 7. Pequeno delay para estabilização antes de criar tarefas
     delay(300);
