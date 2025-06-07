@@ -1,88 +1,72 @@
-### 1. **Definir os sensores adequados**
+# Sistema de Prevenção de Desastres Naturais com ESP32
 
-- **Tarefa**: Escolher os sensores certos para medir variáveis ambientais relevantes ao tipo de desastre (ex: temperatura, umidade, gás, pressão, chuva, etc.).
-- **Progresso**: Feito. Escolhido sensor DHT22, que será usado para temperatura e umidade.
-- **Exemplos**:
-  - `DHT22` – Temperatura e umidade (bom para detectar risco de deslizamentos ou incêndios).
-  - `BMP180` ou `BME280` – Pressão atmosférica (útil para prever tempestades).
-  - `MQ-2`, `MQ-135` – Gases inflamáveis e qualidade do ar (útil para incêndios).
-  - Simuladores do Wokwi.
+## 📖 Sobre o este módulo do projeto
 
-### 2. **Montar o circuito de sensores (virtual)**
+Este modulo (`/sensors`) lida com um dispositivo IoT (Internet das Coisas) focado na prevenção de desastres naturais. O sistema utiliza um microcontrolador ESP32 para coletar dados ambientais, como temperatura e umidade, que são cruciais para a identificação de riscos como incêndios florestais ou deslizamentos.
 
-- **Tarefa**: Configurar os sensores corretamente na simulação (Wokwi).
-- **Progresso**: Feito. Criado diagrama com um sensor e um led.
-- **Melhor prática**:
-  - No **Wokwi**, usar os blocos de sensores conectando aos **pinos GPIO compatíveis**.
-  - Evitar usar GPIOs reservados da ESP32 (ex: GPIOs 6-11 usados pelo flash).
-  - Documentar o **mapeamento dos pinos** (ex: DHT22 → GPIO 4).
+O dispositivo envia os dados coletados para uma API central, que seria responsável por analisar as informações e gerar alertas.
 
-### 3. **Escrever o código de leitura dos sensores**
+## ✅ Status das 4 Tarefas Principais
 
-- **Tarefa**: Programar em C++ (com framework Arduino) para capturar dados dos sensores e enviar via serial (ou outro protocolo).
-- **Progresso**: Iniciada. Estrutura do código sendo definida.
-- **Melhor prática**:
-  - Organizar o código em funções limpas: `lerTemperatura()`, `lerUmidade()`, etc.
-  - Use bibliotecas estáveis: `DHT.h`, `Adafruit_Sensor`, etc.
-  - Incluir tratamento de erros (ex: `isnan(temp)`).
-  - Exemplo básico:
-    ```cpp
-    #include <DHT.h>
-    #define DHTPIN 4
-    #define DHTTYPE DHT22
-    DHT dht(DHTPIN, DHTTYPE);
+As quatro metas iniciais definidas para o projeto foram concluídas com sucesso.
 
-    void setup() {
-      Serial.begin(115200);
-      dht.begin();
-    }
+### 1. Definir os sensores adequados
+- **Status:** ✅ Concluída
+- **Detalhes:** Foi escolhido o sensor **DHT22** para medir temperatura e umidade do ar. Esses dados são essenciais para monitorar condições que podem levar a desastres.
 
-    void loop() {
-      float temp = dht.readTemperature();
-      float hum = dht.readHumidity();
-      if (!isnan(temp) && !isnan(hum)) {
-        Serial.print("T:");
-        Serial.print(temp);
-        Serial.print(" H:");
-        Serial.println(hum);
-      }
-      delay(2000);
-    }
+### 2. Montar o circuito de sensores (virtual)
+- **Status:** ✅ Concluída
+- **Detalhes:** O circuito foi projetado e simulado na plataforma **Wokwi**. Ele inclui o ESP32, o sensor DHT22 e um LED para alertas visuais.
 
-    ```
+### 3. Escrever o código de leitura dos sensores
+- **Status:** ✅ Concluída
+- **Detalhes:** O firmware foi desenvolvido em **C++** com PlatformIO. O módulo `SensorManager` é responsável por fazer a leitura contínua dos dados, aplicando filtros para garantir a qualidade das medições.
 
-### 4. **Transmitir os dados para o sistema principal**
+### 4. Transmitir os dados para o sistema principal
+- **Status:** ✅ Concluída
+- **Detalhes:** Esta é a funcionalidade central do projeto. Foi criado um **`ApiClient`** que formata os dados dos sensores em **JSON** e os envia para uma API externa através de uma requisição `HTTP POST`.
 
-- **Tarefa**: Enviar os dados lidos dos sensores para o backend que irá armazenar/analisar (via serial, MQTT, HTTP, etc.).
-- **Progresso**: Não iniciada.
-- **Melhor prática**:
-  - Formatar os dados em **JSON** ou CSV para facilitar leitura no Python.
-  - Exemplo JSON:
-    ```json
-    { "temp": 32.5, "hum": 45.0 }
-    ```
+**Exemplo do JSON enviado para a API**:
+```json
+{
+  "temperatura": 29.5,
+  "umidade": 45.1,
+  "timestamp": 1677611200
+}
+```
 
 ---
 
-## 🔧 Ferramentas utilizadas
+## ⚙️ Como o Sistema Funciona
 
-- **Wokwi**: Para simular sensores, circuitos e códigos Arduino com ESP32.
-- **PlatformIO**: Para programar ESP32 (em C++).
-- **Serial Monitor / Python Script**: Para capturar os dados e redirecionar ao banco.
-- **Diagrama de pinos (ESP32)**: Para evitar conflitos ao atribuir sensores.
-
----
-
-## Diagrama de Pinos
-
-| Componente   | Pino ESP32 | Função                  |
-| ------------ | ---------- | ----------------------- |
-| DTH22 (Data) | GPIO23     | Ler umidade/temperatura |
-| LED          | GPIO21     | Alertar Perigo          |
+1.  **Leitura**: O `SensorManager` lê os valores de temperatura e umidade do sensor DHT22 em intervalos regulares.
+2.  **Conexão**: O `WiFiManager` conecta o ESP32 a uma rede Wi-Fi e gerencia a reconexão automática em caso de falha.
+3.  **Transmissão**: O `ApiClient` pega os dados mais recentes, monta o payload JSON e os envia para o endpoint da API configurado.
+4.  **Monitoramento Local (Opcional)**: Um servidor web embarcado (`AsyncWebServer`) permite visualizar os dados em tempo real através de um navegador, acessando o IP do dispositivo na rede local.
 
 ---
 
-### Como Simular Variações Ambientais
+## 🔧 Hardware e Pinos
 
-- No ambiente Wokwi, useos **sliders ou inputs numéricos** para alterar variáveis como umidade ou temperatura.
-- Testae cenários críticos. Exemplo: alta temperatura + baixa umidade → risco de incêndio.
+| Componente | Pino ESP32 | Função |
+| :--- | :--- | :--- |
+| **DHT22** (Data) | `GPIO23` | Ler umidade/temperatura |
+| **LED** (Indicador) | `GPIO21` | Alertar Perigo / Status |
+
+---
+
+## 🚀 Como Executar o Projeto
+
+### Pré-requisitos
+- [Visual Studio Code](https://code.visualstudio.com/)
+- Extensão [PlatformIO IDE](https://platformio.org/platformio-ide)
+
+### Passos
+1.  **Clone o repositório** e abra a pasta no VS Code.
+2.  **Configure o WiFi e a API**: Altere as credenciais do WiFi (`WIFI_SSID`, `WIFI_PASSWORD`) e o endereço da sua API (`API_ENDPOINT_URL`) no arquivo `include/Config.h`.
+3.  **Compile e Envie**: Use os botões do PlatformIO na barra de status (`Build`, `Upload`) para carregar o código no seu ESP32.
+4.  **Monitore**: Abra o `Serial Monitor` para acompanhar os logs e ver o endereço IP do dispositivo.
+
+### Simulação no Wokwi
+O projeto é compatível com o simulador **Wokwi**. Basta carregar os arquivos do projeto. O código irá se adaptar automaticamente ao ambiente de simulação. Você pode clicar no sensor DHT22 para alterar os valores e testar o sistema.
+```
