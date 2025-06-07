@@ -11,10 +11,7 @@ import json
 import logging
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from urllib.parse import urlencode, quote
 
 import requests

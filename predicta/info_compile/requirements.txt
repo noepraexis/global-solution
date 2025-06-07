@@ -1,0 +1,7 @@
+pillow
+openai
+beautifulsoup4
+pandas
+requests
+lxml
+dotenv
